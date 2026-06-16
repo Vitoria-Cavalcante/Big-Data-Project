@@ -1,0 +1,391 @@
+<h2 class="sr-only">Dashboard sociodemográfico nacional IBGE 2022/2023 com 4 análises SQL interativas: densidade demográfica por UF, IDH e renda por macrorregião, frota de veículos acima da média, e mapa de vulnerabilidade social.</h2>
+
+<style>
+.kpi-g{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:1.25rem}
+.kpi-c{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:1rem}
+.kpi-l{font-size:12px;color:var(--color-text-secondary);margin-bottom:6px}
+.kpi-v{font-size:24px;font-weight:500;color:var(--color-text-primary);line-height:1.1}
+.kpi-s{font-size:11px;color:var(--color-text-tertiary);margin-top:4px}
+.nav{display:flex;border-bottom:0.5px solid var(--color-border-tertiary);margin-bottom:0;overflow-x:auto;gap:0}
+.tab{padding:10px 16px;font-size:13px;font-weight:500;color:var(--color-text-secondary);border-bottom:2px solid transparent;cursor:pointer;text-decoration:none;display:inline-block;transition:color .15s,border-color .15s;white-space:nowrap}
+.tab:hover{color:var(--color-text-primary);border-bottom-color:var(--color-border-secondary)}
+.tab.on{color:var(--color-text-primary);border-bottom-color:var(--color-text-primary)}
+.tnum{font-family:var(--font-mono);font-size:10px;border-radius:4px;padding:2px 6px;margin-right:6px}
+.sec{padding-top:1.5rem}
+.bdg{display:inline-block;font-size:11px;font-weight:500;border-radius:var(--border-radius-md);padding:3px 10px;margin-bottom:10px;font-family:var(--font-mono);letter-spacing:.5px}
+.sql{background:var(--color-background-tertiary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:14px 16px;margin:12px 0;font-family:var(--font-mono);font-size:12px;line-height:1.8;overflow-x:auto}
+.kw{color:var(--color-text-info)} .fn{color:var(--color-text-warning)} .str{color:var(--color-text-success)} .nm{color:var(--color-text-danger)} .cm{color:var(--color-text-tertiary)}
+.cc{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:1.25rem;margin:12px 0}
+.ins{border-left:2px solid var(--color-border-info);padding:14px 16px;margin:0 0 2rem;background:var(--color-background-secondary);border-radius:0}
+.leg{display:flex;flex-wrap:wrap;gap:14px;margin-top:14px;font-size:12px;color:var(--color-text-secondary)}
+.ld{width:10px;height:10px;border-radius:2px;display:inline-block;margin-right:5px;vertical-align:middle}
+.fr{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+.fb{font-size:12px;padding:5px 12px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-secondary);background:transparent;color:var(--color-text-secondary);cursor:pointer;font-family:var(--font-sans);transition:all .15s}
+.fb:hover,.fb.on{background:var(--color-background-info);color:var(--color-text-info);border-color:transparent}
+.sep{border:none;border-top:0.5px solid var(--color-border-tertiary);margin:2rem 0}
+</style>
+
+<div style="padding-top:1rem">
+  <p style="font-size:11px;letter-spacing:1.5px;text-transform:uppercase;font-family:var(--font-mono);color:var(--color-text-tertiary);margin-bottom:6px">IBGE Estatísticas Brasil · 2022/2023 · Análise SQL</p>
+  <h1 style="font-size:22px;font-weight:500;margin-bottom:4px;color:var(--color-text-primary)">Dashboard sociodemográfico nacional</h1>
+  <p style="font-size:14px;color:var(--color-text-secondary);margin-bottom:1.25rem">27 unidades federativas · ETL Python → SQLite → 4 desafios com classificação automática</p>
+  <div class="kpi-g">
+    <div class="kpi-c"><div class="kpi-l">UFs analisadas</div><div class="kpi-v" id="k1">—</div><div class="kpi-s">todas as unidades federativas</div></div>
+    <div class="kpi-c"><div class="kpi-l">IDH médio nacional</div><div class="kpi-v" id="k2">—</div><div class="kpi-s">PNUD 2021</div></div>
+    <div class="kpi-c"><div class="kpi-l">Renda per capita média</div><div class="kpi-v" id="k3">—</div><div class="kpi-s">rendimento mensal domiciliar 2023</div></div>
+    <div class="kpi-c"><div class="kpi-l">UFs em vulnerabilidade</div><div class="kpi-v" id="k4">—</div><div class="kpi-s">renda &lt;R$1.500 + &gt;200k matrículas</div></div>
+  </div>
+</div>
+
+<nav class="nav">
+  <a href="#s1" class="tab on" onclick="setTab(this)"><span class="tnum" style="background:var(--color-background-info);color:var(--color-text-info)">D1</span>Densidade</a>
+  <a href="#s2" class="tab" onclick="setTab(this)"><span class="tnum" style="background:var(--color-background-success);color:var(--color-text-success)">D2</span>Regional</a>
+  <a href="#s3" class="tab" onclick="setTab(this)"><span class="tnum" style="background:var(--color-background-warning);color:var(--color-text-warning)">D3</span>Frota</a>
+  <a href="#s4" class="tab" onclick="setTab(this)"><span class="tnum" style="background:var(--color-background-danger);color:var(--color-text-danger)">D4</span>Vulnerabilidade</a>
+</nav>
+
+<section class="sec" id="s1">
+  <span class="bdg" style="background:var(--color-background-info);color:var(--color-text-info)">Desafio 1</span>
+  <h2 style="font-size:18px;font-weight:500;margin-bottom:4px;color:var(--color-text-primary)">Densidade demográfica por UF</h2>
+  <p style="font-size:14px;color:var(--color-text-secondary);margin-bottom:12px">Cálculo aritmético <code style="font-family:var(--font-mono)">populacao / area_km2</code> com ordenação decrescente e classificação automática por faixa de adensamento.</p>
+  <div class="sql">
+    <span class="kw">SELECT</span> uf, regiao, <span class="fn">ROUND</span>(populacao / area_km2, <span class="nm">2</span>) <span class="kw">AS</span> densidade_calculada,<br>
+    &nbsp;&nbsp;<span class="kw">CASE</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">WHEN</span> (populacao / area_km2) &gt;= <span class="nm">100</span> <span class="kw">THEN</span> <span class="str">'Alta Densidade'</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">WHEN</span> (populacao / area_km2) &gt;= <span class="nm">20</span>&nbsp; <span class="kw">THEN</span> <span class="str">'Média Densidade'</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">WHEN</span> (populacao / area_km2) &gt;= <span class="nm">5</span>&nbsp;&nbsp; <span class="kw">THEN</span> <span class="str">'Baixa Densidade'</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">ELSE</span> <span class="str">'Muito Baixa Densidade'</span><br>
+    &nbsp;&nbsp;<span class="kw">END AS</span> classificacao_densidade<br>
+    <span class="kw">FROM</span> censo <span class="kw">ORDER BY</span> densidade_calculada <span class="kw">DESC</span>;
+  </div>
+  <div class="fr">
+    <span style="font-size:12px;color:var(--color-text-tertiary)">Filtrar por região:</span>
+    <button class="fb on" data-r="Todos" onclick="filterD1(this)">Todos</button>
+    <button class="fb" data-r="Norte" onclick="filterD1(this)">Norte</button>
+    <button class="fb" data-r="Nordeste" onclick="filterD1(this)">Nordeste</button>
+    <button class="fb" data-r="Centro-Oeste" onclick="filterD1(this)">Centro-Oeste</button>
+    <button class="fb" data-r="Sudeste" onclick="filterD1(this)">Sudeste</button>
+    <button class="fb" data-r="Sul" onclick="filterD1(this)">Sul</button>
+  </div>
+  <div class="cc">
+    <div id="w1" style="position:relative;width:100%;height:1160px">
+      <canvas id="c1" role="img" aria-label="Gráfico horizontal de densidade demográfica das 27 UFs. Distrito Federal: 489 hab/km², Rio de Janeiro: 402, São Paulo: 179. Amazonas menor com 2,53.">DF:489, RJ:402, SP:179, AL:112, SE:107, PE:99, ES:89, SC:82, PB:72, RN:67, CE:62, PR:58, RS:41, MG:37, BA:25, GO:21, MA:21, PI:13, MS:8, RO:8, PA:7, TO:6, AP:5, AC:5, MT:4, RR:3, AM:3.</canvas>
+    </div>
+    <div class="leg">
+      <span><span class="ld" style="background:#E24B4A"></span>Alta (≥100 hab/km²) · 5 UFs</span>
+      <span><span class="ld" style="background:#EF9F27"></span>Média (20–99) · 12 UFs</span>
+      <span><span class="ld" style="background:#1D9E75"></span>Baixa (5–19) · 7 UFs</span>
+      <span><span class="ld" style="background:#888780"></span>Muito baixa (&lt;5) · 3 UFs</span>
+    </div>
+  </div>
+  <div class="ins">
+    <p style="font-size:11px;font-family:var(--font-mono);color:var(--color-text-info);margin-bottom:8px">→ insight analítico · Desafio 1</p>
+    <p style="font-size:14px;color:var(--color-text-secondary);line-height:1.7">DF, RJ, SP, AL e SE concentram populações em áreas relativamente pequenas — pressão constante sobre infraestrutura urbana. Amazonas, Roraima e Mato Grosso (menos de 5 hab/km²) enfrentam o oposto: custo per capita elevadíssimo de serviços em territórios imensíssimos. <span style="color:var(--color-text-primary)">Políticas públicas uniformes aplicadas igualmente a todas as UFs são estruturalmente injustas.</span></p>
+  </div>
+</section>
+
+<hr class="sep">
+
+<section class="sec" id="s2">
+  <span class="bdg" style="background:var(--color-background-success);color:var(--color-text-success)">Desafio 2</span>
+  <h2 style="font-size:18px;font-weight:500;margin-bottom:4px;color:var(--color-text-primary)">Agregação macrorregional — IDH e renda</h2>
+  <p style="font-size:14px;color:var(--color-text-secondary);margin-bottom:12px">Médias de IDH e rendimento per capita agrupadas via <code style="font-family:var(--font-mono)">GROUP BY regiao</code>. Duplo eixo Y para comparação simultânea. Passe o mouse sobre as barras para ver o status classificado automaticamente.</p>
+  <div class="sql">
+    <span class="kw">SELECT</span> regiao, <span class="fn">COUNT</span>(uf) <span class="kw">AS</span> total_estados,<br>
+    &nbsp;&nbsp;<span class="fn">ROUND</span>(<span class="fn">AVG</span>(idh), <span class="nm">3</span>) <span class="kw">AS</span> media_idh,<br>
+    &nbsp;&nbsp;<span class="fn">ROUND</span>(<span class="fn">AVG</span>(rendimento_per_capita), <span class="nm">2</span>) <span class="kw">AS</span> media_rendimento_per_capita,<br>
+    &nbsp;&nbsp;<span class="kw">CASE WHEN</span> <span class="fn">AVG</span>(idh) &gt;= <span class="nm">0.750</span> <span class="kw">THEN</span> <span class="str">'IDH Alto'</span> <span class="kw">WHEN</span> <span class="fn">AVG</span>(idh) &gt;= <span class="nm">0.700</span> <span class="kw">THEN</span> <span class="str">'IDH Médio-Alto'</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">ELSE</span> <span class="str">'IDH Médio'</span> <span class="kw">END AS</span> status_idh,<br>
+    &nbsp;&nbsp;<span class="kw">CASE WHEN</span> <span class="fn">AVG</span>(rendimento_per_capita) &gt;= <span class="nm">2000</span> <span class="kw">THEN</span> <span class="str">'Renda Alta'</span> <span class="kw">ELSE</span> <span class="str">'Renda Baixa'</span> <span class="kw">END AS</span> status_renda<br>
+    <span class="kw">FROM</span> censo <span class="kw">GROUP BY</span> regiao <span class="kw">ORDER BY</span> media_idh <span class="kw">DESC</span>;
+  </div>
+  <div class="cc">
+    <div style="position:relative;width:100%;height:360px">
+      <canvas id="c2" role="img" aria-label="Gráfico de barras agrupadas por macrorregião. Sul lidera IDH com 0,756 e renda R$ 2.624. Nordeste tem menor IDH 0,686 e renda R$ 1.169.">Sul: IDH 0,756 / R$2.624. Sudeste: 0,754 / R$2.259. Centro-Oeste: 0,751 / R$2.440. Norte: 0,699 / R$1.363. Nordeste: 0,686 / R$1.169.</canvas>
+    </div>
+    <div class="leg">
+      <span><span class="ld" style="background:#1D9E75"></span>IDH médio (eixo esquerdo)</span>
+      <span><span class="ld" style="background:#EF9F27"></span>Renda per capita — R$ (eixo direito)</span>
+    </div>
+  </div>
+  <div class="ins" style="border-left-color:var(--color-border-success)">
+    <p style="font-size:11px;font-family:var(--font-mono);color:var(--color-text-success);margin-bottom:8px">→ insight analítico · Desafio 2</p>
+    <p style="font-size:14px;color:var(--color-text-secondary);line-height:1.7">Sul, Sudeste e Centro-Oeste formam um bloco homogêneo de IDH Alto e Renda Alta. Norte e Nordeste — <span style="color:var(--color-text-primary)">16 dos 27 estados</span> — operam em IDH Médio e Renda Baixa. A renda do Sul (R$ 2.624) é <span style="color:var(--color-text-primary)">2,25× maior</span> que a do Nordeste (R$ 1.169). A desigualdade regional brasileira é estrutural, não marginal.</p>
+  </div>
+</section>
+
+<hr class="sep">
+
+<section class="sec" id="s3">
+  <span class="bdg" style="background:var(--color-background-warning);color:var(--color-text-warning)">Desafio 3</span>
+  <h2 style="font-size:18px;font-weight:500;margin-bottom:4px;color:var(--color-text-primary)">Frota acima da média nacional</h2>
+  <p style="font-size:14px;color:var(--color-text-secondary);margin-bottom:12px">Média calculada via <code style="font-family:var(--font-mono)">subquery</code> dinâmica — nenhum valor fixo no código. A linha tracejada mostra a média nacional de 4.022.899 veículos calculada em tempo de execução.</p>
+  <div class="sql">
+    <span class="kw">SELECT</span> uf, regiao, total_veiculos,<br>
+    &nbsp;&nbsp;<span class="fn">ROUND</span>((<span class="kw">SELECT</span> <span class="fn">AVG</span>(total_veiculos) <span class="kw">FROM</span> censo), <span class="nm">0</span>) <span class="kw">AS</span> media_nacional,<br>
+    &nbsp;&nbsp;total_veiculos - (<span class="kw">SELECT</span> <span class="fn">AVG</span>(total_veiculos) <span class="kw">FROM</span> censo) <span class="kw">AS</span> excedente_da_media,<br>
+    &nbsp;&nbsp;<span class="kw">CASE WHEN</span> total_veiculos &gt; (<span class="kw">SELECT</span> <span class="fn">AVG</span>…) * <span class="nm">3</span> <span class="kw">THEN</span> <span class="str">'Muito Acima da Média'</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">WHEN</span> total_veiculos &gt; (<span class="kw">SELECT</span> <span class="fn">AVG</span>…) <span class="kw">THEN</span> <span class="str">'Acima da Média'</span> <span class="kw">END AS</span> status_frota<br>
+    <span class="kw">FROM</span> censo <span class="kw">WHERE</span> total_veiculos &gt; (<span class="kw">SELECT</span> <span class="fn">AVG</span>(total_veiculos) <span class="kw">FROM</span> censo)<br>
+    <span class="kw">ORDER BY</span> total_veiculos <span class="kw">DESC</span>;
+  </div>
+  <div class="cc">
+    <div style="position:relative;width:100%;height:380px">
+      <canvas id="c3" role="img" aria-label="Gráfico de barras verticais dos 8 estados com frota acima da média nacional de 4 milhões. São Paulo lidera com 35 milhões, em vermelho. Os demais em azul. Linha tracejada vermelha indica a média.">SP:35M, MG:11,9M, RJ:7,7M, PR:7,2M, RS:7M, SC:5,2M, BA:4,9M, GO:4,2M. Média: 4,02M.</canvas>
+    </div>
+    <div class="leg">
+      <span><span class="ld" style="background:#E24B4A"></span>Muito acima da média (&gt;3×)</span>
+      <span><span class="ld" style="background:#378ADD"></span>Acima da média</span>
+      <span style="display:flex;align-items:center;gap:6px"><span style="width:20px;border-top:2px dashed #E24B4A;display:inline-block"></span>Média nacional: 4.022.899</span>
+    </div>
+  </div>
+  <div class="ins" style="border-left-color:var(--color-border-warning)">
+    <p style="font-size:11px;font-family:var(--font-mono);color:var(--color-text-warning);margin-bottom:8px">→ insight analítico · Desafio 3</p>
+    <p style="font-size:14px;color:var(--color-text-secondary);line-height:1.7">São Paulo com 35 milhões de veículos é um outlier extremo que distorce a média nacional para cima. Dos 8 estados acima da média, 6 pertencem ao Sudeste e Sul. Os <span style="color:var(--color-text-primary)">19 estados abaixo</span> sinalizam dependência crítica de transporte público, que historicamente recebe subinvestimento nas regiões Norte e Nordeste.</p>
+  </div>
+</section>
+
+<hr class="sep">
+
+<section class="sec" id="s4" style="padding-bottom:2rem">
+  <span class="bdg" style="background:var(--color-background-danger);color:var(--color-text-danger)">Desafio 4</span>
+  <h2 style="font-size:18px;font-weight:500;margin-bottom:4px;color:var(--color-text-primary)">Mapa de vulnerabilidade social</h2>
+  <p style="font-size:14px;color:var(--color-text-secondary);margin-bottom:12px">Estados com renda &lt; R$1.500 <code style="font-family:var(--font-mono)">AND</code> mais de 200k matrículas no ensino fundamental. Eixo X = renda (esquerda = mais crítico). Passe o mouse para ver o estado e seus dados.</p>
+  <div class="sql">
+    <span class="kw">SELECT</span> uf, regiao, rendimento_per_capita, matriculas_ensino_fundamental,<br>
+    &nbsp;&nbsp;<span class="kw">CASE</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">WHEN</span> rendimento_per_capita &lt; <span class="nm">1000</span> <span class="kw">THEN</span> <span class="str">'Vulnerabilidade Crítica'</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">WHEN</span> rendimento_per_capita &lt; <span class="nm">1200</span> <span class="kw">THEN</span> <span class="str">'Alta Vulnerabilidade'</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">ELSE</span> <span class="str">'Vulnerabilidade Moderada'</span><br>
+    &nbsp;&nbsp;<span class="kw">END AS</span> nivel_vulnerabilidade,<br>
+    &nbsp;&nbsp;<span class="kw">CASE WHEN</span> matriculas_ensino_fundamental &gt; <span class="nm">1000000</span> <span class="kw">THEN</span> <span class="str">'Alta Demanda'</span> <span class="kw">ELSE</span> <span class="str">'Média/Baixa Demanda'</span> <span class="kw">END AS</span> demanda_escolar<br>
+    <span class="kw">FROM</span> censo<br>
+    <span class="kw">WHERE</span> rendimento_per_capita &lt; <span class="nm">1500</span> <span class="kw">AND</span> matriculas_ensino_fundamental &gt; <span class="nm">200000</span><br>
+    <span class="kw">ORDER BY</span> rendimento_per_capita <span class="kw">ASC</span>;
+  </div>
+  <div class="cc">
+    <div style="position:relative;width:100%;height:420px">
+      <canvas id="c4" role="img" aria-label="Gráfico de dispersão com 12 estados vulneráveis. Eixo X: renda per capita. Eixo Y: matrículas no ensino fundamental. Maranhão: R$945 / 1.064.699 matrículas em vermelho. Bahia: R$1.139 / 1.946.957 matrículas.">Maranhão R$945/1.065k, Pará R$1.112/1.373k, Bahia R$1.139/1.947k, Amazonas R$1.172/703k, Paraíba R$1.195/564k, Sergipe R$1.195/350k, Ceará R$1.214/1.270k, RN R$1.238/510k, PE R$1.383/1.378k, Tocantins R$1.427/232k.</canvas>
+    </div>
+    <div class="leg">
+      <span><span class="ld" style="background:#E24B4A;border-radius:50%"></span>Vulnerabilidade crítica (renda &lt; R$1.000) · 1 UF</span>
+      <span><span class="ld" style="background:#EF9F27;border-radius:50%"></span>Alta vulnerabilidade (R$1.000–1.199) · 7 UFs</span>
+      <span><span class="ld" style="background:#F5C842;border-radius:50%"></span>Vulnerabilidade moderada (R$1.200–1.499) · 4 UFs</span>
+    </div>
+  </div>
+  <div class="ins" style="border-left-color:var(--color-border-danger)">
+    <p style="font-size:11px;font-family:var(--font-mono);color:var(--color-text-danger);margin-bottom:8px">→ insight analítico · Desafio 4</p>
+    <p style="font-size:14px;color:var(--color-text-secondary);line-height:1.7"><span style="color:var(--color-text-primary)">12 estados</span> (10 do Nordeste, 2 do Norte) concentram o perfil mais crítico de vulnerabilidade. O Maranhão — R$945 e mais de 1 milhão de matrículas — é o caso extremo: máxima demanda escolar, mínima capacidade de financiamento. <span style="color:var(--color-text-primary)">Nenhum estado do Sul, Sudeste ou Centro-Oeste</span> atende às duas condições simultaneamente.</p>
+  </div>
+</section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const d1all=[
+  {uf:'Distrito Federal',r:'Centro-Oeste',d:489.06,c:'A'},{uf:'Rio de Janeiro',r:'Sudeste',d:402.49,c:'A'},
+  {uf:'São Paulo',r:'Sudeste',d:178.92,c:'A'},{uf:'Alagoas',r:'Nordeste',d:112.38,c:'A'},
+  {uf:'Sergipe',r:'Nordeste',d:106.73,c:'A'},{uf:'Pernambuco',r:'Nordeste',d:98.57,c:'M'},
+  {uf:'Espírito Santo',r:'Sudeste',d:89.17,c:'M'},{uf:'Santa Catarina',r:'Sul',d:81.83,c:'M'},
+  {uf:'Paraíba',r:'Nordeste',d:71.53,c:'M'},{uf:'Rio Grande do Norte',r:'Nordeste',d:67.43,c:'M'},
+  {uf:'Ceará',r:'Nordeste',d:62.05,c:'M'},{uf:'Paraná',r:'Sul',d:57.78,c:'M'},
+  {uf:'Rio Grande do Sul',r:'Sul',d:40.70,c:'M'},{uf:'Minas Gerais',r:'Sudeste',d:36.51,c:'M'},
+  {uf:'Bahia',r:'Nordeste',d:25.04,c:'M'},{uf:'Goiás',r:'Centro-Oeste',d:21.22,c:'M'},
+  {uf:'Maranhão',r:'Nordeste',d:20.55,c:'M'},{uf:'Piauí',r:'Nordeste',d:12.79,c:'B'},
+  {uf:'Mato Grosso do Sul',r:'Centro-Oeste',d:7.72,c:'B'},{uf:'Rondônia',r:'Norte',d:7.63,c:'B'},
+  {uf:'Pará',r:'Norte',d:6.98,c:'B'},{uf:'Tocantins',r:'Norte',d:5.79,c:'B'},
+  {uf:'Amapá',r:'Norte',d:5.15,c:'B'},{uf:'Acre',r:'Norte',d:5.06,c:'B'},
+  {uf:'Mato Grosso',r:'Centro-Oeste',d:4.19,c:'X'},{uf:'Roraima',r:'Norte',d:2.84,c:'X'},
+  {uf:'Amazonas',r:'Norte',d:2.53,c:'X'}
+];
+const cm={A:'#E24B4A',M:'#EF9F27',B:'#1D9E75',X:'#888780'};
+const cnL={A:'Alta Densidade',M:'Média Densidade',B:'Baixa Densidade',X:'Muito Baixa Densidade'};
+const dark=matchMedia('(prefers-color-scheme:dark)').matches;
+const gc=dark?'rgba(255,255,255,0.07)':'rgba(0,0,0,0.07)';
+const tc=dark?'#7A90A8':'#6B7A8D';
+const tb={backgroundColor:dark?'#1E3050':'#fff',borderColor:dark?'#2D4A6A':'#E5E7EB',
+  borderWidth:1,padding:10,titleColor:dark?'#D9E6F2':'#111827',bodyColor:dark?'#8EA8C4':'#6B7280'};
+
+let C1=null;
+function buildD1(data){
+  const w=document.getElementById('w1');
+  w.style.height=Math.max(320,data.length*40+80)+'px';
+  if(C1)C1.destroy();
+  C1=new Chart(document.getElementById('c1'),{
+    type:'bar',
+    data:{
+      labels:data.map(d=>d.uf),
+      datasets:[{
+        data:data.map(d=>d.d),
+        backgroundColor:data.map(d=>cm[d.c]+'CC'),
+        borderColor:data.map(d=>cm[d.c]),
+        borderWidth:1,borderRadius:3
+      }]
+    },
+    options:{
+      indexAxis:'y',responsive:true,maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{...tb,callbacks:{
+          title:i=>[i[0].label],
+          label:i=>{const d=data[i.dataIndex];return[` ${i.raw} hab/km²`,` ${cnL[d.c]}`,` Região: ${d.r}`];}
+        }}
+      },
+      scales:{
+        x:{grid:{color:gc},ticks:{color:tc},title:{display:true,text:'hab/km²',color:tc,font:{size:11}}},
+        y:{grid:{display:false},ticks:{color:tc,font:{size:11}}}
+      }
+    }
+  });
+}
+
+window.filterD1=function(btn){
+  document.querySelectorAll('.fb').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  const r=btn.dataset.r;
+  buildD1(r==='Todos'?d1all:d1all.filter(d=>d.r===r));
+};
+
+new Chart(document.getElementById('c2'),{
+  type:'bar',
+  data:{
+    labels:['Sul','Sudeste','Centro-Oeste','Norte','Nordeste'],
+    datasets:[
+      {label:'IDH médio',data:[0.756,0.754,0.751,0.699,0.686],
+        backgroundColor:'rgba(29,158,117,0.75)',borderColor:'#1D9E75',borderWidth:1,borderRadius:4,yAxisID:'yL'},
+      {label:'Renda (R$)',data:[2624,2259,2440,1363,1169],
+        backgroundColor:'rgba(239,159,39,0.75)',borderColor:'#EF9F27',borderWidth:1,borderRadius:4,yAxisID:'yR'}
+    ]
+  },
+  options:{
+    responsive:true,maintainAspectRatio:false,
+    plugins:{
+      legend:{display:false},
+      tooltip:{...tb,callbacks:{
+        label:i=>i.datasetIndex===0
+          ?` IDH: ${i.raw.toFixed(3)} — ${i.raw>=0.750?'IDH Alto':'IDH Médio'}`
+          :` Renda: R$ ${i.raw.toLocaleString('pt-BR')} — ${i.raw>=2000?'Renda Alta':'Renda Baixa'}`
+      }}
+    },
+    scales:{
+      yL:{type:'linear',position:'left',min:0.65,max:0.82,grid:{color:gc},
+          ticks:{color:'#1D9E75',callback:v=>v.toFixed(3)},
+          title:{display:true,text:'IDH',color:'#1D9E75',font:{size:11}}},
+      yR:{type:'linear',position:'right',min:0,max:3100,grid:{display:false},
+          ticks:{color:'#EF9F27',callback:v=>'R$'+v.toLocaleString('pt-BR')},
+          title:{display:true,text:'Renda (R$)',color:'#EF9F27',font:{size:11}}},
+      x:{grid:{display:false},ticks:{color:tc}}
+    }
+  }
+});
+
+const d3d=[
+  {uf:'São Paulo',f:35091000,s:'m'},{uf:'Minas Gerais',f:11891402,s:'a'},
+  {uf:'Rio de Janeiro',f:7743212,s:'a'},{uf:'Paraná',f:7190000,s:'a'},
+  {uf:'Rio Grande do Sul',f:6978234,s:'a'},{uf:'Santa Catarina',f:5189234,s:'a'},
+  {uf:'Bahia',f:4887673,s:'a'},{uf:'Goiás',f:4199523,s:'a'}
+];
+const med=4022899;
+new Chart(document.getElementById('c3'),{
+  data:{
+    labels:d3d.map(d=>d.uf),
+    datasets:[
+      {type:'bar',label:'Frota total',data:d3d.map(d=>d.f),
+        backgroundColor:d3d.map(d=>d.s==='m'?'rgba(226,75,74,0.8)':'rgba(55,138,221,0.75)'),
+        borderColor:d3d.map(d=>d.s==='m'?'#E24B4A':'#378ADD'),
+        borderWidth:1,borderRadius:4,yAxisID:'y'},
+      {type:'line',label:'Média nacional',data:Array(8).fill(med),
+        borderColor:'#E24B4A',borderWidth:2,borderDash:[6,4],pointRadius:0,fill:false,yAxisID:'y'}
+    ]
+  },
+  options:{
+    responsive:true,maintainAspectRatio:false,
+    plugins:{
+      legend:{display:false},
+      tooltip:{...tb,callbacks:{
+        label:i=>i.datasetIndex===1
+          ?` Média nacional: ${med.toLocaleString('pt-BR')}`
+          :[` Frota: ${i.raw.toLocaleString('pt-BR')}`,` Excedente: +${(i.raw-med).toLocaleString('pt-BR')}`,` Status: ${d3d[i.dataIndex].s==='m'?'Muito Acima da Média':'Acima da Média'}`]
+      }}
+    },
+    scales:{
+      y:{grid:{color:gc},ticks:{color:tc,callback:v=>(v/1e6).toFixed(0)+'M'},
+         title:{display:true,text:'Total de veículos',color:tc,font:{size:11}}},
+      x:{grid:{display:false},ticks:{color:tc,maxRotation:20}}
+    }
+  }
+});
+
+const d4d=[
+  {uf:'Maranhão',x:945,y:1064699,n:'C'},{uf:'Piauí',x:1104,y:453011,n:'A'},
+  {uf:'Alagoas',x:1110,y:458782,n:'A'},{uf:'Pará',x:1112,y:1372895,n:'A'},
+  {uf:'Bahia',x:1139,y:1946957,n:'A'},{uf:'Amazonas',x:1172,y:702763,n:'A'},
+  {uf:'Paraíba',x:1195,y:563914,n:'A'},{uf:'Sergipe',x:1195,y:350481,n:'A'},
+  {uf:'Ceará',x:1214,y:1270312,n:'M'},{uf:'Rio Grande do Norte',x:1238,y:510219,n:'M'},
+  {uf:'Pernambuco',x:1383,y:1378021,n:'M'},{uf:'Tocantins',x:1427,y:231879,n:'M'}
+];
+const d4lbl={C:'Vulnerabilidade crítica',A:'Alta vulnerabilidade',M:'Vulnerabilidade moderada'};
+const d4clr={C:'#E24B4A',A:'#EF9F27',M:'#F5C842'};
+const d4shp={C:'circle',A:'rect',M:'triangle'};
+function mkDs(n){
+  return{
+    label:d4lbl[n],
+    data:d4d.filter(d=>d.n===n).map(d=>({x:d.x,y:d.y,uf:d.uf})),
+    backgroundColor:d4clr[n]+'CC',borderColor:d4clr[n],
+    pointStyle:d4shp[n],pointRadius:11,pointHoverRadius:14
+  };
+}
+new Chart(document.getElementById('c4'),{
+  type:'scatter',
+  data:{datasets:[mkDs('C'),mkDs('A'),mkDs('M')]},
+  options:{
+    responsive:true,maintainAspectRatio:false,
+    layout:{padding:20},
+    plugins:{
+      legend:{display:false},
+      tooltip:{...tb,callbacks:{
+        title:i=>[i[0].raw.uf],
+        label:i=>[` Renda: R$ ${i.raw.x.toLocaleString('pt-BR')}`,` Matrículas: ${i.raw.y.toLocaleString('pt-BR')}`,` Nível: ${i.dataset.label}`]
+      }}
+    },
+    scales:{
+      x:{min:820,max:1560,grid:{color:gc},ticks:{color:tc,callback:v=>'R$'+v},
+         title:{display:true,text:'Rendimento per capita (R$)',color:tc,font:{size:12}}},
+      y:{min:0,max:2200000,grid:{color:gc},ticks:{color:tc,callback:v=>(v/1000).toFixed(0)+'k'},
+         title:{display:true,text:'Matrículas ensino fundamental',color:tc,font:{size:12}}}
+    }
+  }
+});
+
+function animC(id,target,fmt,dur){
+  const el=document.getElementById(id);
+  const t0=performance.now();
+  (function step(now){
+    const p=Math.min(1,(now-t0)/dur);
+    const e=1-Math.pow(1-p,3);
+    el.textContent=fmt(e*target);
+    if(p<1)requestAnimationFrame(step);
+  })(t0);
+}
+
+function init(){
+  if(typeof Chart==='undefined'){setTimeout(init,60);return;}
+  buildD1(d1all);
+  animC('k1',27,v=>Math.round(v).toString(),900);
+  animC('k2',0.717,v=>v.toFixed(3).replace('.',','),1400);
+  animC('k3',1731,v=>'R$ '+Math.round(v).toLocaleString('pt-BR'),1400);
+  animC('k4',12,v=>Math.round(v).toString(),1100);
+}
+init();
+
+window.setTab=function(a){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+  a.classList.add('on');
+};
+document.querySelectorAll('a.tab[href^="#"]').forEach(a=>{
+  a.addEventListener('click',function(e){
+    e.preventDefault();
+    const el=document.querySelector(this.getAttribute('href'));
+    if(el)el.scrollIntoView({behavior:'smooth',block:'start'});
+  });
+});
+</script>
